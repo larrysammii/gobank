@@ -18,27 +18,31 @@ type PostgresStore struct {
 	db *sql.DB
 }
 
+// Instanciate a postgres container:
+// ```
 // docker run --name some-postgres -e POSTGRES_PASSWORD=gobank -p 5432:5432 -d postgres
-// map port 5432 to 5432 or whatever is available
+// ```
+// map port 5432 to 5432 or whatever is available.
 //
-// Connect to postgres container to use psql bash commands
+// Connect to postgres container to use psql bash commands:
 // ```
 // docker exec -it some-postgres bash
 // psql -h localhost -U postgres
 // ```
 //
-// I had error "pq: role "postgres" does not exist",
+// I had error when I run the server: "pq: role "postgres" does not exist",
 // turns out there was postgres running on my machine, and probably clashes with the port,
 // if you installed postgres via homebrew, kill it as below:
 // ```
 // brew services stop postgres
 // ```
-//
+// or just map it to another port idk.
+
+// To check connection:
 // ```
 // docker ps
-// telnet localhost 5432
+// telnet localhost {whatever the port you used, eg. 5432}
 // ```
-// to check connection
 
 func NewPostgresStore() (*PostgresStore, error) {
 	connStr := "user=postgres dbname=postgres password=gobank sslmode=disable"
