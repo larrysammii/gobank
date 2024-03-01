@@ -25,7 +25,7 @@ func (s *APISever) Run() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/account", makeHttpHandleFunc(s.handleAccount))
-	router.HandleFunc("/account/{id}", makeHttpHandleFunc(s.handleGetAccount))
+	router.HandleFunc("/account/{id}", makeHttpHandleFunc(s.handleGetAccountByID))
 
 	log.Println("JSON API server running on port: ", s.listenAddr)
 
@@ -46,7 +46,18 @@ func (s *APISever) handleAccount(w http.ResponseWriter, r *http.Request) error {
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
+// GET /account
+// GET /accounts
 func (s *APISever) handleGetAccount(w http.ResponseWriter, r *http.Request) error {
+	accounts, err := s.store.GetAccounts()
+	if err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, accounts)
+}
+
+func (s *APISever) handleGetAccountByID(w http.ResponseWriter, r *http.Request) error {
 
 	id := mux.Vars(r)["id"]
 	// .Vars take the request and return a map of the variables that are in the request
@@ -59,7 +70,22 @@ func (s *APISever) handleGetAccount(w http.ResponseWriter, r *http.Request) erro
 }
 
 func (s *APISever) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	createAccountReq := new(CreateAccountRequest)
+	// createAccountReq := CreateAccountRequest{}
+	// 	if err := json.NewDecoder(r.Body).Decode(&createAccountReq); err != nil {
+	// 	return err
+	// }
+	if err := json.NewDecoder(r.Body).Decode(createAccountReq); err != nil {
+		return err
+	}
+
+	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName)
+
+	if err := s.store.CreateAccount(account); err != nil {
+		return err
+	}
+
+	return WriteJSON(w, http.StatusOK, account)
 }
 
 func (s *APISever) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
