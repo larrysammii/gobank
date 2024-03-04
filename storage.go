@@ -113,16 +113,27 @@ func (s *PostgresStore) GetAccountByID(id int) (*Account, error) {
 }
 
 func (s *PostgresStore) GetAccounts() ([]*Account, error) {
+
 	rows, err := s.db.Query("SELECT * FROM account")
+	//
+	// the SQL query
+	//
 	if err != nil {
 		return nil, err
 	}
 
 	accounts := []*Account{}
+	// Instantiate an empty slice of Account struct (An array of Account struct without a known length)
 
 	for rows.Next() {
+		// Iterate through the rows from the SQL query
 		account := new(Account)
+		// Instantiate a new Account struct
 		err = rows.Scan(
+			// Scan the rows from the SQL query
+			// and assign the values to the fields of the Account struct
+			// if the fields are not of the same type/order/number, it will throw an error
+
 			&account.ID,
 			&account.FirstName,
 			&account.LastName,
@@ -136,6 +147,7 @@ func (s *PostgresStore) GetAccounts() ([]*Account, error) {
 		}
 
 		accounts = append(accounts, account)
+		// If no error, append the account to the slice of accounts
 
 	}
 	return accounts, nil
