@@ -37,6 +37,7 @@ func NewAPISever(listenAddr string, store Storage) *APISever {
 func (s *APISever) Run() {
 	router := mux.NewRouter()
 
+	router.HandleFunc("/login", makeHttpHandleFunc(s.handleLogin))
 	router.HandleFunc("/account", makeHttpHandleFunc(s.handleAccount))
 	router.HandleFunc("/account/{id}", withJWTAuth(makeHttpHandleFunc(s.handleGetAccountByID), s.store))
 	router.HandleFunc("/transfer", makeHttpHandleFunc(s.handleTransfer))
@@ -49,7 +50,46 @@ func (s *APISever) Run() {
 }
 
 // -------------------------------------------------------------------------------------
-// The Big Function that handles all the requests
+//
+// # The Big Function that handles all the requests??
+//
+// -------------------------------------------------------------------------------------
+//
+
+func (s *APISever) handleLogin(w http.ResponseWriter, r *http.Request) error {
+
+	if r.Method != "POST" {
+		return fmt.Errorf("method not allowed %s", r.Method)
+	}
+
+	var req LoginRequest // whats var
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return err
+	}
+
+	acc, err := s.store.GetAccountByNumber(int(req.Number))
+	if err != nil {
+		return err // handle this error as json
+	}
+
+	if !acc.ValidatePw(req.Password) {
+		return fmt.Errorf("access denied, fuck off lmao")
+	}
+
+	token, err := createJWT(acc)
+	if err != nil {
+		return err
+	}
+
+	resp := LoginResponse{
+		Token:  token,
+		Number: acc.Number,
+	}
+
+	return WriteJSON(w, http.StatusOK, resp)
+}
+
 func (s *APISever) handleAccount(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
 		return s.handleGetAccount(w, r)
@@ -60,8 +100,6 @@ func (s *APISever) handleAccount(w http.ResponseWriter, r *http.Request) error {
 
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
-
-// -------------------------------------------------------------------------------------
 
 // GET /account/{id}
 func (s *APISever) handleGetAccountByID(w http.ResponseWriter, r *http.Request) error {
@@ -105,28 +143,30 @@ func (s *APISever) handleGetAccount(w http.ResponseWriter, r *http.Request) erro
 
 // POST /account
 func (s *APISever) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	createAccountReq := new(CreateAccountRequest)
-	// createAccountReq := CreateAccountRequest{}
-	// 	if err := json.NewDecoder(r.Body).Decode(&createAccountReq); err != nil {
-	// 	return err
-	// }
-	if err := json.NewDecoder(r.Body).Decode(createAccountReq); err != nil {
+
+	req := new(CreateAccountRequest)
+
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
 		return err
 	}
 
-	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName)
+	account, err := NewAccount(req.FirstName, req.LastName, req.Password)
+	if err != nil {
+		return err
+	}
 
 	if err := s.store.CreateAccount(account); err != nil {
 		return err
 	}
 
-	tokenString, err := createJWT(account)
-	if err != nil {
+	// tokenString, err := createJWT(account)
+	// if err != nil {
 
-		return err
+	// 	return err
 
-	}
-	fmt.Println("JWT token: ", tokenString)
+	// }
+	// fmt.Println("JWT token: ", tokenString)
+
 	return WriteJSON(w, http.StatusOK, account)
 }
 
@@ -167,6 +207,12 @@ type ApiError struct {
 	Error string `json:"error"`
 }
 
+// -------------------------------------------------------------------------------------
+//
+// JWT middleware:
+// Need comments to explain how it works
+//
+// -------------------------------------------------------------------------------------
 func createJWT(account *Account) (string, error) {
 	claims := &jwt.MapClaims{
 		"expiresAt":     15000,
@@ -239,6 +285,8 @@ func validateJWT(tokenString string) (*jwt.Token, error) {
 	})
 }
 
+// -------------------------------------------------------------------------------------
+//
 // Define the apiFunc type
 // Function alias is a way to give a new name to an existing type or function
 // The apiFunc type is a function that takes an http.ResponseWriter and an http.Request and returns an error
